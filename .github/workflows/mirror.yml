@@ -1,0 +1,29 @@
+name: Mirror ROM to Google Drive
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'URL file ROM'
+        required: true
+        type: string
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Optimasi Storage Runner
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
+      - name: Unduh File ROM
+        run: |
+          mkdir -p downloads
+          echo "Mengunduh dari: ${{ github.event.inputs.rom_url }}"
+          wget -P downloads/ --content-disposition --no-check-certificate "${{ github.event.inputs.rom_url }}"
+
+      - name: Setup Rclone dan Upload ke Google One
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF }}" > ~/.config/rclone/rclone.conf
+          sudo apt update && sudo apt install rclone -y
+          echo "Memulai unggah ke Google Drive..."
+          rclone copy downloads/ gdrive:Mirror_ROM/ -v --stats 5s
