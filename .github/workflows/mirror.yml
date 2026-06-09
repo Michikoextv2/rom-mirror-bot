@@ -21,18 +21,11 @@ jobs:
           wget -P downloads/ --content-disposition --no-check-certificate "${{ github.event.inputs.rom_url }}"
 
       - name: Setup Rclone dan Upload ke Google One
-        env:
-          RCLONE_SECRET: ${{ secrets.RCLONE_CONF }}
         run: |
-          # 1. Buat folder konfigurasi
           mkdir -p ~/.config/rclone
-          
-          # 2. Masukkan secret ke dalam file conf secara aman
-          echo "$RCLONE_SECRET" > ~/.config/rclone/rclone.conf
-          
-          # 3. Instal Rclone
+          cat << 'EOF' > ~/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONF }}
+          EOF
           sudo apt update && sudo apt install rclone -y
-          
-          # 4. Eksekusi Upload
           echo "Memulai unggah ke Google Drive..."
           rclone copy downloads/ gdrive:Mirror_ROM/ -v --stats 5s
