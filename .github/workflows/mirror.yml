@@ -6,26 +6,68 @@ on:
         description: 'URL file ROM'
         required: true
         type: string
+      chat_id:
+        description: 'Telegram Chat ID'
+        required: true
+        type: string
+      thread_id:
+        description: 'Telegram Thread ID'
+        required: false
+        type: string
 
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
+      - name: 💬 Laporan 1 - Proses Dimulai
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.inputs.chat_id }}" \
+            -d message_thread_id="${{ github.event.inputs.thread_id }}" \
+            -d text="⚙️ [1/3] Server GitHub mulai menyala dan menyiapkan ruang penyimpanan..."
+
       - name: Optimasi Storage Runner
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+
+      - name: 💬 Laporan 2 - Mengunduh File
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.inputs.chat_id }}" \
+            -d message_thread_id="${{ github.event.inputs.thread_id }}" \
+            -d text="📥 [2/3] Sedang mengunduh file ROM dari server asal..."
 
       - name: Unduh File ROM
         run: |
           mkdir -p downloads
-          echo "Mengunduh dari: ${{ github.event.inputs.rom_url }}"
           wget -P downloads/ --content-disposition --no-check-certificate "${{ github.event.inputs.rom_url }}"
 
-      - name: Setup Rclone dan Upload ke Google One
+      - name: Setup Rclone, Upload, dan 💬 Laporan 3 (Link Final)
         run: |
+          # Setup Rclone
           mkdir -p ~/.config/rclone
           cat << 'EOF' > ~/.config/rclone/rclone.conf
           ${{ secrets.RCLONE_CONF }}
           EOF
           sudo apt update && sudo apt install rclone -y
-          echo "Memulai unggah ke Google Drive..."
-          rclone copy downloads/ gdrive:Mirror_ROM/ -v --stats 5s
+          
+          # Dapatkan Nama File yang baru diunduh
+          FILENAME=$(ls downloads/ | head -n 1)
+          
+          # Laporan Mulai Upload
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.inputs.chat_id }}" \
+            -d message_thread_id="${{ github.event.inputs.thread_id }}" \
+            -d text="☁️ [3/3] Unduhan selesai! Sekarang mengunggah '$FILENAME' ke Google Drive 5TB..."
+            
+          # Eksekusi Upload Rclone
+          rclone copy downloads/ gdrive:Mirror_ROM/ -v
+          
+          # Generate Link Publik GDrive
+          GD_LINK=$(rclone link "gdrive:Mirror_ROM/$FILENAME")
+          
+          # Laporan Final beserta Link
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ github.event.inputs.chat_id }}" \
+            -d message_thread_id="${{ github.event.inputs.thread_id }}" \
+            -d parse_mode="HTML" \
+            -d text="✅ <b>MIRROR SELESAI!</b>%0A%0A📦 <b>Nama File:</b> $FILENAME%0A🔗 <b>Link GDrive:</b> $GD_LINK"
